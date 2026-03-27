@@ -1,10 +1,175 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Github Pages</title>
-  </head>
-  <body>
-    <h1>This is a Webiste Hosted in Gihtub Pages</h1>
-    
-  </body>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sudoku Pro | CSP Solver & Generator</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --primary: #38bdf8;
+            --accent: #818cf8;
+            --text: #f1f5f9;
+            --border: #334155;
+            --error: #ef4444;
+            --success: #22c55e;
+            --clue: #94a3b8;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        #app {
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        /* Sudoku Grid */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(9, 50px);
+            grid-template-rows: repeat(9, 50px);
+            border: 3px solid var(--primary);
+            background: var(--border);
+            gap: 1px;
+        }
+
+        .cell {
+            width: 50px;
+            height: 50px;
+            background: var(--card);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.1s;
+            border: none;
+            color: var(--text);
+            outline: none;
+        }
+
+        .cell:hover { background: var(--border); }
+        .cell.selected { background: rgba(56, 189, 248, 0.2); box-shadow: inset 0 0 0 2px var(--primary); }
+        .cell.clue { color: var(--clue); }
+        .cell.invalid { color: var(--error); background: rgba(239, 68, 68, 0.1); }
+        .cell.solved-anim { color: var(--success); }
+
+        /* Borders for 3x3 blocks */
+        .cell:nth-child(3n) { border-right: 2px solid var(--primary); }
+        .cell:nth-child(9n) { border-right: none; }
+        .cell:nth-child(n+19):nth-child(-n+27),
+        .cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 2px solid var(--primary); }
+
+        /* Sidebar Controls */
+        .sidebar {
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .stats {
+            font-size: 0.875rem;
+            color: var(--clue);
+            background: rgba(0,0,0,0.2);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+        }
+
+        button {
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            background: var(--primary);
+            color: var(--bg);
+        }
+
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button.secondary { background: var(--border); color: var(--text); }
+        
+        .difficulty-btns {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .numpad button { background: var(--border); color: var(--text); font-size: 1.2rem; }
+
+        .header h1 { margin: 0 0 0.5rem 0; font-size: 1.5rem; color: var(--primary); }
+        .header p { margin: 0; font-size: 0.875rem; color: var(--clue); }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="main">
+        <div class="header" style="margin-bottom: 1.5rem;">
+            <h1>SUDOKU PRO</h1>
+            <p>High-Performance CSP Engine</p>
+        </div>
+        <div id="grid" class="grid-container"></div>
+    </div>
+
+    <div class="sidebar">
+        <div class="difficulty-btns">
+            <button class="secondary" onclick="game.generate('easy')">Easy</button>
+            <button class="secondary" onclick="game.generate('medium')">Med</button>
+            <button class="secondary" onclick="game.generate('hard')">Hard</button>
+        </div>
+        
+        <button onclick="game.solveInstant()">SOLVE INSTANTLY</button>
+        <button class="secondary" onclick="game.visualizeSolve()">VISUALIZE SOLVER</button>
+        <button style="background: var(--error); color: white;" onclick="game.clear()">CLEAR BOARD</button>
+
+        <div class="numpad">
+            <button onclick="game.inputNum(1)">1</button>
+            <button onclick="game.inputNum(2)">2</button>
+            <button onclick="game.inputNum(3)">3</button>
+            <button onclick="game.inputNum(4)">4</button>
+            <button onclick="game.inputNum(5)">5</button>
+            <button onclick="game.inputNum(6)">6</button>
+            <button onclick="game.inputNum(7)">7</button>
+            <button onclick="game.inputNum(8)">8</button>
+            <button onclick="game.inputNum(9)">9</button>
+            <button style="grid-column: span 3;" onclick="game.inputNum(0)">ERASE (0)</button>
+        </div>
+
+        <div class="stats">
+            <div>Nodes Explored: <span id="nodes">0</span></div>
+            <div>Time: <span id="time">0ms</span></div>
+            <div id="status" style="margin-top: 5px; color: var(--primary);">Ready</div>
+        </div>
+    </div>
+</div>
+
+<script src="game.js">
+</script>
+</body>
 </html>
